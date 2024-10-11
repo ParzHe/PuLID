@@ -37,7 +37,7 @@ configs = {
         repo_id="black-forest-labs/FLUX.1-dev",
         repo_flow="flux1-dev.safetensors",
         repo_ae="ae.safetensors",
-        ckpt_path='models/flux1-dev.safetensors',
+        ckpt_path=os.getenv("FLUX_DEV"),
         params=FluxParams(
             in_channels=64,
             vec_in_dim=768,
@@ -52,7 +52,7 @@ configs = {
             qkv_bias=True,
             guidance_embed=True,
         ),
-        ae_path='models/ae.safetensors',
+        ae_path=os.getenv("AE"),
         ae_params=AutoEncoderParams(
             resolution=256,
             in_channels=3,
@@ -121,7 +121,7 @@ def load_flow_model(name: str, device: str = "cuda", hf_download: bool = True):
         and configs[name].repo_flow is not None
         and hf_download
     ):
-        ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow, local_dir='models')
+        ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_flow, local_dir=os.getenv("MODELS_DIR"))
 
     with torch.device(device):
         model = Flux(configs[name].params).to(torch.bfloat16)
@@ -138,14 +138,15 @@ def load_flow_model(name: str, device: str = "cuda", hf_download: bool = True):
 def load_flow_model_quintized(name: str, device: str = "cuda", hf_download: bool = True):
     # Loading Flux
     print("Init model")
-    ckpt_path = 'models/flux-dev-fp8.safetensors'
+    ckpt_path = os.getenv("FLUX_DEV_FP8")
     if (
         not os.path.exists(ckpt_path)
         and hf_download
     ):
-        ckpt_path = hf_hub_download("XLabs-AI/flux-dev-fp8", "flux-dev-fp8.safetensors")
-    json_path = hf_hub_download("XLabs-AI/flux-dev-fp8", 'flux_dev_quantization_map.json')
-
+        ckpt_path = hf_hub_download("XLabs-AI/flux-dev-fp8", "flux-dev-fp8.safetensors",local_dir=os.getenv("MODELS_DIR"))
+    # json_path = hf_hub_download("XLabs-AI/flux-dev-fp8", 'flux_dev_quantization_map.json',local_dir="/home/tom/fshare/models/XLabs-AI/flux-dev-fp8")
+    json_path = "/home/tom/models/flux_dev_quantization_map.json"
+    
     model = Flux(configs[name].params).to(torch.bfloat16)
 
     print("Loading checkpoint")
@@ -162,12 +163,17 @@ def load_flow_model_quintized(name: str, device: str = "cuda", hf_download: bool
 
 def load_t5(device: str = "cuda", max_length: int = 512) -> HFEmbedder:
     # max length 64, 128, 256 and 512 should work (if your sequence is short enough)
-    return HFEmbedder("xlabs-ai/xflux_text_encoders", max_length=max_length, torch_dtype=torch.bfloat16).to(device)
+    if os.path.isdir(os.getenv("TEXT_ENCODER")):
+        return HFEmbedder(os.getenv("TEXT_ENCODER"), max_length=max_length, torch_dtype=torch.bfloat16).to(device)
+    else:
+        return HFEmbedder("XLabs-AI/xflux_text_encoders", max_length=max_length, torch_dtype=torch.bfloat16).to(device)
 
 
 def load_clip(device: str = "cuda") -> HFEmbedder:
-    return HFEmbedder("openai/clip-vit-large-patch14", max_length=77, torch_dtype=torch.bfloat16).to(device)
-
+    if os.path.isdir(os.getenv("CLIP")):
+        return HFEmbedder(os.getenv("CLIP"), max_length=77, torch_dtype=torch.bfloat16).to(device)
+    else:
+        return HFEmbedder("openai/clip-vit-large-patch14", max_length=77, torch_dtype=torch.bfloat16).to(device)
 
 def load_ae(name: str, device: str = "cuda", hf_download: bool = True) -> AutoEncoder:
     ckpt_path = configs[name].ae_path
@@ -177,7 +183,7 @@ def load_ae(name: str, device: str = "cuda", hf_download: bool = True) -> AutoEn
         and configs[name].repo_ae is not None
         and hf_download
     ):
-        ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_ae, local_dir='models')
+        ckpt_path = hf_hub_download(configs[name].repo_id, configs[name].repo_ae, local_dir=os.getenv("MODELS_DIR"))
 
     # Loading the autoencoder
     print("Init AE")

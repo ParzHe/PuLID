@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from torchvision.utils import make_grid
 from transformers import PretrainedConfig
 
+import pynvml
 
 def seed_everything(seed):
     os.environ["PL_GLOBAL_SEED"] = str(seed)
@@ -164,3 +165,24 @@ def tensor2img(tensor, rgb2bgr=True, out_type=np.uint8, min_max=(0, 1)):
     if len(result) == 1:
         result = result[0]
     return result
+
+def bytes_to_giga_bytes(bytes):
+    return bytes / 1024 / 1024 / 1024
+
+def get_gpu_mem_info(gpu_id=0):
+    """
+    根据显卡 id 获取显存使用信息, 单位 MB
+    :param gpu_id: 显卡 ID
+    :return: total 所有的显存，used 当前使用的显存, free 可使用的显存
+    """
+    pynvml.nvmlInit()
+    if gpu_id < 0 or gpu_id >= pynvml.nvmlDeviceGetCount():
+        print(f"gpu_id {gpu_id} 对应的显卡不存在!")
+        return 0, 0, 0
+
+    handler = pynvml.nvmlDeviceGetHandleByIndex(gpu_id)
+    meminfo = pynvml.nvmlDeviceGetMemoryInfo(handler)
+    total = round(bytes_to_giga_bytes(meminfo.total), 2)
+    used = round(bytes_to_giga_bytes(meminfo.used))
+    free = round(bytes_to_giga_bytes(meminfo.free), 2) # GB
+    return total, used, free
